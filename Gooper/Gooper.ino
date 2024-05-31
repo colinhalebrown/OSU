@@ -26,24 +26,38 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 /* -------------------- GLOBAL VARS -------------------- */
 
 // define pins
-const int BUZ_PIN = 5;
-const int LED1_PIN = 6;
-const int LED2_PIN = 9;
-const int RLY1_PIN = 10;
-const int RLY2_PIN = 11;
-const int BAT_PIN = A0;
-const int CHG_PIN = A1;
-const int ARM_PIN = A2;
-const int CON_PIN = A3;
+const int BUZ_PIN = 5; // Peizo Buzzer
+const int LED1_PIN = 6; // Radio Indicator
+const int LED2_PIN = 9; // Pad LP Indicator
+const int LED3_PIN = 10; // Pad LC Indicator
+const int LED4_PIN = 11; // Pad Continuity Indicator
+const int LED5_PIN = 12; // Firing Button LED
+const int LED6_PIN = 13; // Power Switch LED
 
-// voltages
+const int ARM_PIN = 25;
+const int FIRE_PIN = 24;
+const int BAT_PIN = A0; // Controller Voltage divider
+
+// voltage
 int BatVoltage = 0;
-int ChgVoltage = 0;
-int ArmVoltage = 0;
-int ConVoltage = 0;
 
 // radio variables
 int16_t packetnum = 0;  // packet counter, we increment per xmission
+bool WestVoltage = true;
+bool IgnVoltage = true;
+bool Armed = false;
+bool Fire = false;
+bool Continuity = false;
+
+// Box States
+int ArmSW;
+int FireBTN;
+
+// Commands
+bool ArmSystem = false;
+bool FireSystem = false;
+
+// West State
 
 /* -------------------- CORE 0 -------------------- */
 
@@ -52,18 +66,19 @@ void setup() {
   pinMode(BUZ_PIN , OUTPUT);
   pinMode(LED1_PIN, OUTPUT);
   pinMode(LED2_PIN, OUTPUT);
-  pinMode(RLY1_PIN, OUTPUT);
-  pinMode(RLY2_PIN, OUTPUT);
+  pinMode(LED3_PIN, OUTPUT);
+  pinMode(LED4_PIN, OUTPUT);
+  pinMode(LED5_PIN, OUTPUT);
+  pinMode(LED6_PIN, OUTPUT);
+
+  pinMode(ARM_PIN, INPUT);
+  pinMode(FIRE_PIN, INPUT);
 
   // begin serial
   Serial.begin(115200);
 
-  // check status of arming switch
-
-  // check status of fire button
-
   // ensure startup success
-  while (ARMED || FIRING) {
+  while (digitalRead(ARM_PIN) == HIGH || digitalRead(FIRE_PIN) == HIGH) {
     // blink that fucking armed LED like crazy
 
     // re-read the arming switch
@@ -77,10 +92,22 @@ void loop() {
   BatVoltage = analogRead(BAT_PIN); Serial.println(BatVoltage);
     
   // check ARMING SWITCH
+  ArmSW = digitalRead(ARM_PIN);
 
   // check FIRE BUTTON
+  FireBTN = digitalRead(FIRE_PIN);
 
-  // OTHER USER INPUTS...
+  if (ArmSW == HIGH) {
+    ArmSystem = true;
+    if (FireBTN == HIGH) {
+      FireSystem = true;
+    } else {
+      FireSystem = false;
+    }
+  } else {
+    ArmSystem = false;
+    FireSystem = false;
+  }
 
   // if armed
     // while armed, prepare to fire
@@ -137,6 +164,9 @@ void loop1() {
 
   Serial.println("Transmitting...");
 
+  if (ArmSystem == true) {
+    char radiopacket
+  }
   char radiopacket[20] = "Hello World #      ";
   itoa(packetnum++, radiopacket+13, 10);
   Serial.print("Sending "); Serial.println(radiopacket);
@@ -183,7 +213,7 @@ void loop1() {
 
 /* -------------------- FUNCTIONS -------------------- */
 
-void pulse(int PIN,int PINState,int beginMillis,int interval) {
+void pulse(int PIN,int PINState,int previousMillis,int interval) {
   // see Examples > 02.Digital > BlinkWithoutDelay
   // PIN - PIN ID of associated component
   // PINState - state of the associated component
