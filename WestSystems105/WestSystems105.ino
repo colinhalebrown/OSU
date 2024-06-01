@@ -7,12 +7,12 @@ Colin Hale-Brown
 Dexter Carpenter
 */
 
-/* -------------------- INCLUDED LIBRARIES ------------- */
+/* -------------------- INCLUDED LIBRARIES -------------------- */
 
 #include <SPI.h>
-#include <RH_RF95.h>
+#include <RH_RF95.h> // v1.122.1
 
-/* -------------------- DEFINE HARDWARE ---------------- */
+/* -------------------- DEFINE HARDWARE -------------------- */
 
 // define hardware setup
 #define RFM95_CS   16
@@ -26,15 +26,15 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 /* -------------------- GLOBAL VARS -------------------- */
 
 // define pins
-const int BUZ_PIN = 5; // Peizo Buzzer
-const int LED1_PIN = 6; // Radio Indicator
-const int LED2_PIN = 9; // Armed Indicator
-const int RLY1_PIN = 10; // Arming Relay
-const int RLY2_PIN = 11; // Firing Relay
-const int BAT_PIN = A0; // Controller voltage divider
-const int IGN_PIN = A1; // Ignitor voltage divider
-const int ARM_PIN = A2; // Arming continuity voltage divider
-const int CON_PIN = A3; // Firing continuity voltage divider
+const int BUZZ_PIN = 5;   // Peizo Buzzer
+const int RLED_PIN = 6;   // Radio Indicator
+const int ALED_PIN = 9;   // Armed Indicator
+const int ARM_PIN  = 10;  // Arming Relay
+const int FIRE_PIN = 11;  // Firing Relay
+const int BAT_PIN   = A0; // Controller voltage divider
+const int IVOLT_PIN = A1; // Ignitor voltage divider
+const int AVOLT_PIN = A2; // Arming continuity voltage divider
+const int CVOLT_PIN = A3; // Firing continuity voltage divider
 
 // voltages
 int BatVoltage = 0;
@@ -46,12 +46,12 @@ int ConVoltage = 0;
 bool ArmSystem = false;
 bool FireSystem = false;
 
-// State
+// West State
 bool Armed = false;
 bool Fire = false;
-bool Continuity = false;
 
 // Checks
+bool Standby = false;
 bool ArmIndicator = false;
 bool ConIndicator = false;
 
@@ -60,28 +60,27 @@ bool ConIndicator = false;
 // STANDARD SETUP
 void setup() {
   // put your setup code here, to run once:
-  pinMode(BUZ_PIN, OUTPUT);
-  pinMode(LED1_PIN, OUTPUT);
-  pinMode(LED2_PIN, OUTPUT);
-  pinMode(RLY1_PIN, OUTPUT);
-  pinMode(RLY2_PIN, OUTPUT);
+  pinMode(BUZZ_PIN, OUTPUT);
+  pinMode(RLED_PIN, OUTPUT);
+  pinMode(ALED_PIN, OUTPUT);
+  pinMode(ARM_PIN, OUTPUT);
+  pinMode(FIRE_PIN, OUTPUT);
 
   // begin serial
   Serial.begin(115200);
-
 }
 
 // STANDARD LOOP
 void loop() {
   // collect WS105 battery voltage
-  BatVoltage = analogRead(BAT_PIN); Serial.print("Battery Voltage: "); Serial.println(BatVoltage);
+  BatVoltage = analogRead(BAT_PIN); //Serial.print("Battery Voltage: "); Serial.println(BatVoltage);
 
   // collect charge battery voltage
-  IgnVoltage = analogRead(IGN_PIN); Serial.print("Ignitor Voltage "); Serial.println(IgnVoltage);
+  IgnVoltage = analogRead(IVOLT_PIN); //Serial.print("Ignitor Voltage "); Serial.println(IgnVoltage);
 
   // check status of relay circuits
-  ArmVoltage = analogRead(ARM_PIN); Serial.print("Arm Voltage "); Serial.println(ArmVoltage);
-  ConVoltage = analogRead(CON_PIN); Serial.print("Continuity Voltage "); Serial.println(ConVoltage);
+  ArmVoltage = analogRead(AVOLT_PIN); //Serial.print("Arm Voltage "); Serial.println(ArmVoltage);
+  ConVoltage = analogRead(CVOLT_PIN); //Serial.print("Continuity Voltage "); Serial.println(ConVoltage);
   
   if (ArmVoltage > 100) {
     ArmIndicator = true;
@@ -142,7 +141,7 @@ void loop1() {
     uint8_t len = sizeof(buf);
 
     if (rf95.recv(buf, &len)) {
-      digitalWrite(LED1_PIN, HIGH);
+      digitalWrite(RLED_PIN, LOW);
       RH_RF95::printBuffer("Received: ", buf, len);
       Serial.print("Got: ");
       Serial.println((char*)buf);
@@ -150,11 +149,11 @@ void loop1() {
       Serial.println(rf95.lastRssi(), DEC);
 
       // Send a reply
-      uint8_t data[] = "And hello back to you";
+      uint8_t data[] = "pong";
       rf95.send(data, sizeof(data));
       rf95.waitPacketSent();
       Serial.println("Sent a reply");
-      digitalWrite(LED1_PIN, LOW);
+      digitalWrite(RLED_PIN, HIGH);
     } else {
       Serial.println("Receive failed");
     }
