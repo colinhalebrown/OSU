@@ -47,11 +47,11 @@ bool ArmSystem = false;
 bool FireSystem = false;
 
 // West State
+bool Standby = false;
 bool Armed = false;
 bool Fire = false;
 
 // Checks
-bool Standby = false;
 bool ArmIndicator = false;
 bool ConIndicator = false;
 
@@ -141,19 +141,23 @@ void loop1() {
     uint8_t len = sizeof(buf);
 
     if (rf95.recv(buf, &len)) {
-      digitalWrite(RLED_PIN, LOW);
-      RH_RF95::printBuffer("Received: ", buf, len);
-      Serial.print("Got: ");
-      Serial.println((char*)buf);
-       Serial.print("RSSI: ");
-      Serial.println(rf95.lastRssi(), DEC);
+      // print data received
+      digitalWrite(RLED_PIN, LOW); // Turn off LED
+      //RH_RF95::printBuffer("Received: ", buf, len); // print out hexadecimal
+      char* packet = (char*)buf; // decode packet
+      Serial.print("Got: "); Serial.println(packet); // print decoded message
+      Serial.print("RSSI: "); Serial.println(rf95.lastRssi(), DEC); // print signal strength
+
+      // Adjust Commands and Checks
+      if (packet[0] == '1') { ArmSystem  = true; } else { ArmSystem  = false; } // ArmSystem
+      if (packet[2] == '1') { FireSystem = true; } else { FireSystem = false; } // FireSystem
 
       // Send a reply
       uint8_t data[] = "pong";
       rf95.send(data, sizeof(data));
       rf95.waitPacketSent();
       Serial.println("Sent a reply");
-      digitalWrite(RLED_PIN, HIGH);
+      digitalWrite(RLED_PIN, HIGH); // Blink LED
     } else {
       Serial.println("Receive failed");
     }
