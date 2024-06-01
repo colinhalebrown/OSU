@@ -67,7 +67,7 @@ unsigned long CurrentArmMillis = 0;
 
 // STANDARD SETUP
 void setup() {
-  // put your setup code here, to run once:
+  // set pinmodes
   pinMode(BUZZ_PIN, OUTPUT);
   pinMode(RLED_PIN, OUTPUT);
   pinMode(ALED_PIN, OUTPUT);
@@ -91,14 +91,14 @@ void loop() {
   ConVoltage = analogRead(CVOLT_PIN); //Serial.print("Continuity Voltage "); Serial.println(ConVoltage);
   
   // UPDATE ARMING VOLTAGE
-  if (ArmVoltage > 100) { ArmIndicator = true; } else { ArmIndicator = false; }
+  if (ArmVoltage > 20) { ArmIndicator = true; } else { ArmIndicator = false; }
 
   // UPDATE CONT. VOLTAGE
-  if (ConVoltage > 100) { ConIndicator = true; } else { ConIndicator = false; }
+  if (ConVoltage > 20) { ConIndicator = true; } else { ConIndicator = false; }
 
   // UPDATE ARMING RELAY
   if (ArmSystem) {
-    digitalWrite(ARM_PIN,HIGH); // ARM RELAY
+    digitalWrite(ARM_PIN,HIGH); // ARM RELAY ON
     CurrentArmMillis = millis(); // get current time for arming
     // if within interval
     if (CurrentArmMillis - PreviousArmMillis >= ArmInterval) {
@@ -113,6 +113,7 @@ void loop() {
     digitalWrite(BUZZ_PIN, ArmState);
     digitalWrite(ALED_PIN,!ArmState);
   } else {
+    digitalWrite(ARM_PIN,LOW); // ARM RELAY OFF
     // don't blink or buzz
     digitalWrite(BUZZ_PIN, LOW); // off 
     digitalWrite(ALED_PIN,HIGH); // off
@@ -133,15 +134,23 @@ void loop() {
 
 // RADIO SETUP
 void setup1() {
+  // set pinmodes
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
 
+  // begin serial
   Serial.begin(115200);
-  while (!Serial) delay(1);
-  delay(100);
+  //while (!Serial); // only use for debugging
 
   Serial.println("West Systems 105 RX");
 
+  // manual reset
+  digitalWrite(RFM95_RST, LOW);
+  delay(10);
+  digitalWrite(RFM95_RST, HIGH);
+  delay(10);
+
+  // ensure radio initialization
   while (!rf95.init()) {
     Serial.println("LoRa radio init failed");
     Serial.println("Uncomment '#define SERIAL_DEBUG' in RH_RF95.cpp for detailed debug info");
@@ -162,48 +171,41 @@ void setup1() {
 
 // RADIO LOOP
 void loop1() {
-
+  // if radio available
   if (rf95.available()) {
-    // Should be a message for us now
+    // get message
     uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
     uint8_t len = sizeof(buf);
 
+    // when message received
     if (rf95.recv(buf, &len)) {
       // print data received
-      digitalWrite(RLED_PIN, LOW); // Turn off LED
+      digitalWrite(RLED_PIN, LOW); // Turn off radio LED
       //RH_RF95::printBuffer("Received: ", buf, len); // print out hexadecimal
       char* packetRX = (char*)buf; // decode packet
+      Serial.println();
       Serial.print("RSSI: "); Serial.println(rf95.lastRssi(), DEC); // print signal strength
-      Serial.print("RX: "); Serial.println(packetRX); // print decoded message
+      Serial.print("RX: "); Serial.println(packetRX); // print decoded packet
 
-      // Adjust Commands and Checks
+      // Update Commands
       if (packetRX[0] == '1') { ArmSystem  = true; } else { ArmSystem  = false; } // ArmSystem
       if (packetRX[2] == '1') { FireSystem = true; } else { FireSystem = false; } // FireSystem
 
       // Update packet
-      sprintf(packetRX, "%d %d %d %d %d %d #      ", ArmSystem, FireSystem, ArmIndicator, ConIndicator, LowBatIndicator, LowChgIndicator);
+      len = 20; // define packet length
+      char packetTX[len]; // create packetRX
+      // build packetTX
+      sprintf(packetTX, "%d %d %d %d %d %d #       ", ArmSystem, FireSystem, ArmIndicator, ConIndicator, LowBatIndicator, LowChgIndicator);
 
-      // Send a reply
-      uint8_t* packetTX = (uint8_t*)atoi(packetRX);
-      rf95.send(packetTX, sizeof(packetTX));
-      rf95.waitPacketSent();
-      Serial.print("TX: "); Serial.println(packetRX);
+      // Send packetTX
+      rf95.send((uint8_t*)packetTX, len);
+      rf95.waitPacketSent(); // make sure it sent
+      Serial.print("TX: "); Serial.println((char*)packetTX); // print sent message to serial
       digitalWrite(RLED_PIN, HIGH); // Blink LED
     } else {
       Serial.println("Receive failed");
     }
   }
-
-  // listen for signals
-
-  // ping GOOPER
-    // simple connection ping (handshake)
-    // data handoff
-      // battery data
-      // status data
-
-  // recieve battery and other status info from WestSystems105
-
 }
 
 /* -------------------- FUNCTIONS -------------------- */
