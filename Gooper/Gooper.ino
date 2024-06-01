@@ -45,6 +45,11 @@ int BatVoltage = 0;
 // radio variables
 int16_t packetnum = 0;  // packet counter, we increment per xmission
 int RadioTimeout = 1000; // Timeout in ms
+bool WestVoltage = true;
+bool IgnVoltage = true;
+bool Armed = false;
+bool Fire = false;
+bool Continuity = false;
 
 // Commands
 bool ArmSystem = false;
@@ -53,13 +58,6 @@ bool FireSystem = false;
 // West Checks
 bool ArmIndicator = false;
 bool ConIndicator = false;
-bool WestVoltage = false;
-bool IgnVoltage = false;
-
-// UI variables
-int BlinkInterval = 300;
-unsigned long previousMillis = 0;
-int BlinkState = LOW;
 
 /* -------------------- CORE 0 -------------------- */
 
@@ -98,54 +96,18 @@ void loop() {
 
   if (digitalRead(ARM_PIN) == HIGH) {
     ArmSystem = true;
+    if (digitalRead(FIRE_PIN) == HIGH) {
+      FireSystem = true;
+    } else {
+      FireSystem = false;
+    }
   } else {
     ArmSystem = false;
     FireSystem = false;
   }
 
-  digitalWrite(BUZZ_PIN, LOW);
-  digitalWrite(FLED_PIN, LOW);
-
-  while(ArmSystem == true) {
-    unsigned long currentMillis = millis();
-
-    if (currentMillis - previousMillis >= BlinkInterval) {
-      
-      previousMillis = currentMillis;
-
-      if (BlinkState == LOW) {
-        BlinkState = HIGH;
-      } else {
-        BlinkState = LOW;
-      }
-    }
-
-    digitalWrite(BUZZ_PIN, BlinkState);
-    digitalWrite(FLED_PIN, BlinkState);
-
-    if (digitalRead(ARM_PIN) == HIGH) {
-      ArmSystem = true;
-      if (digitalRead(FIRE_PIN) == HIGH) {
-        FireSystem = true;
-      } else {
-        FireSystem = false;
-      }
-    } else {
-      ArmSystem = false;
-      FireSystem = false;
-    }
-
-  }
-
   // Serial.print("System Armed: "); Serial.println(ArmSystem);
   // Serial.print("Fireing: "); Serial.println(FireSystem);
-
-  if (ArmSystem == true) {
-    // blink fire light
-    // blink 
-  } else if (FireSystem == true) {
-
-  }
 
   delay(200);
   // if armed
@@ -204,14 +166,19 @@ void loop1() {
   Serial.println("Transmitting...");
   digitalWrite(RLED_PIN, HIGH);
 
+  if (ArmSystem == true) {
+    char radiopacket ;
+  }
+
   // Packet Format
-  // "<ArmSystem> <FireSystem> <ArmIndicator> <ConIndicator> <WestVoltage> <IgnVoltage> #<PacketID>"
-  // example: "1 0 1 0 0 1 #42"
-  // This shows the system is sending an armed command and west has armed itself this is the 42nd handshake no firing or continuity. The box is low on igniter voltage but the main battery is fine.
+  // "<ArmSystem> <FireSystem> <ArmIndicator> <ConIndicator> #<PacketID>"
+  // example: "1 0 1 0 #42"
+  // This shows the system is sending an armed command and west has armed itself this is the 42nd handshake no firing or continuity 
+
 
   char radiopacket[15];
-  sprintf(radiopacket, "%d %d %d %d %d %d #      ", ArmSystem, FireSystem, ArmIndicator, ConIndicator, WestVoltage, IgnVoltage);
-  itoa((int)packetnum++, radiopacket+13, 10);
+  sprintf(radiopacket, "%d %d %d %d #      ", ArmSystem, FireSystem, ArmIndicator, ConIndicator);
+  itoa((int)packetnum++, radiopacket+9, 10);
 
   Serial.print("Sending "); Serial.println(radiopacket);
   radiopacket[14] = 0;
@@ -243,9 +210,41 @@ void loop1() {
     Serial.println("No reply, is there a listener around?");
   }
 
+  // listen for signals
+
+  // ping WestSystems105
+    // simple connection ping (handshake)
+    // data handoff
+      // battery data
+      // status data
+    // sending commands to WS105
+
   // recieve battery and other status info from WestSystems105
 
 }
 
 /* -------------------- FUNCTIONS -------------------- */
 
+void pulse(int PIN,int PINState,int previousMillis,int interval) {
+  // see Examples > 02.Digital > BlinkWithoutDelay
+  // PIN - PIN ID of associated component
+  // PINState - state of the associated component
+  // beginMillis - starting time of the pulse
+
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - previousMillis >= interval) {
+    // save the last time you blinked the LED
+    previousMillis = currentMillis;
+
+    // if the LED is off turn it on and vice-versa:
+    if (PINState == LOW) {
+      PINState = HIGH;
+    } else {
+      PINState = LOW;
+    }
+
+  digitalWrite(PIN, PINState);
+  }
+
+}
