@@ -56,6 +56,11 @@ bool ConIndicator = false;
 bool WestVoltage = false;
 bool IgnVoltage = false;
 
+// UI variables
+int BlinkInterval = 300;
+unsigned long previousMillis = 0;
+int BlinkState = LOW;
+
 /* -------------------- CORE 0 -------------------- */
 
 void setup() {
@@ -93,21 +98,51 @@ void loop() {
 
   if (digitalRead(ARM_PIN) == HIGH) {
     ArmSystem = true;
-    if (digitalRead(FIRE_PIN) == HIGH) {
-      FireSystem = true;
-    } else {
-      FireSystem = false;
-    }
   } else {
     ArmSystem = false;
     FireSystem = false;
+  }
+
+  digitalWrite(BUZZ_PIN, LOW);
+  digitalWrite(FLED_PIN, LOW);
+
+  while(ArmSystem == true) {
+    unsigned long currentMillis = millis();
+
+    if (currentMillis - previousMillis >= BlinkInterval) {
+      
+      previousMillis = currentMillis;
+
+      if (BlinkState == LOW) {
+        BlinkState = HIGH;
+      } else {
+        BlinkState = LOW;
+      }
+    }
+
+    digitalWrite(BUZZ_PIN, BlinkState);
+    digitalWrite(FLED_PIN, BlinkState);
+
+    if (digitalRead(ARM_PIN) == HIGH) {
+      ArmSystem = true;
+      if (digitalRead(FIRE_PIN) == HIGH) {
+        FireSystem = true;
+      } else {
+        FireSystem = false;
+      }
+    } else {
+      ArmSystem = false;
+      FireSystem = false;
+    }
+
   }
 
   // Serial.print("System Armed: "); Serial.println(ArmSystem);
   // Serial.print("Fireing: "); Serial.println(FireSystem);
 
   if (ArmSystem == true) {
-
+    // blink fire light
+    // blink 
   } else if (FireSystem == true) {
 
   }
@@ -208,41 +243,9 @@ void loop1() {
     Serial.println("No reply, is there a listener around?");
   }
 
-  // listen for signals
-
-  // ping WestSystems105
-    // simple connection ping (handshake)
-    // data handoff
-      // battery data
-      // status data
-    // sending commands to WS105
-
   // recieve battery and other status info from WestSystems105
 
 }
 
 /* -------------------- FUNCTIONS -------------------- */
 
-void pulse(int PIN,int PINState,int previousMillis,int interval) {
-  // see Examples > 02.Digital > BlinkWithoutDelay
-  // PIN - PIN ID of associated component
-  // PINState - state of the associated component
-  // beginMillis - starting time of the pulse
-
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - previousMillis >= interval) {
-    // save the last time you blinked the LED
-    previousMillis = currentMillis;
-
-    // if the LED is off turn it on and vice-versa:
-    if (PINState == LOW) {
-      PINState = HIGH;
-    } else {
-      PINState = LOW;
-    }
-
-  digitalWrite(PIN, PINState);
-  }
-
-}
