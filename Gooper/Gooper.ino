@@ -45,11 +45,6 @@ int BatVoltage = 0;
 // radio variables
 int16_t packetnum = 0;  // packet counter, we increment per xmission
 int RadioTimeout = 1000; // Timeout in ms
-bool WestVoltage = true;
-bool IgnVoltage = true;
-bool Armed = false;
-bool Fire = false;
-bool Continuity = false;
 
 // Commands
 bool ArmSystem = false;
@@ -58,6 +53,8 @@ bool FireSystem = false;
 // West Checks
 bool ArmIndicator = false;
 bool ConIndicator = false;
+bool WestVoltage = false;
+bool IgnVoltage = false;
 
 /* -------------------- CORE 0 -------------------- */
 
@@ -108,6 +105,12 @@ void loop() {
 
   // Serial.print("System Armed: "); Serial.println(ArmSystem);
   // Serial.print("Fireing: "); Serial.println(FireSystem);
+
+  if (ArmSystem == true) {
+
+  } else if (FireSystem == true) {
+
+  }
 
   delay(200);
   // if armed
@@ -166,19 +169,14 @@ void loop1() {
   Serial.println("Transmitting...");
   digitalWrite(RLED_PIN, HIGH);
 
-  if (ArmSystem == true) {
-    char radiopacket ;
-  }
-
   // Packet Format
-  // "<ArmSystem> <FireSystem> <ArmIndicator> <ConIndicator> #<PacketID>"
-  // example: "1 0 1 0 #42"
-  // This shows the system is sending an armed command and west has armed itself this is the 42nd handshake no firing or continuity 
-
+  // "<ArmSystem> <FireSystem> <ArmIndicator> <ConIndicator> <WestVoltage> <IgnVoltage> #<PacketID>"
+  // example: "1 0 1 0 0 1 #42"
+  // This shows the system is sending an armed command and west has armed itself this is the 42nd handshake no firing or continuity. The box is low on igniter voltage but the main battery is fine.
 
   char radiopacket[15];
-  sprintf(radiopacket, "%d %d %d %d #      ", ArmSystem, FireSystem, ArmIndicator, ConIndicator);
-  itoa((int)packetnum++, radiopacket+9, 10);
+  sprintf(radiopacket, "%d %d %d %d %d %d #      ", ArmSystem, FireSystem, ArmIndicator, ConIndicator, WestVoltage, IgnVoltage);
+  itoa((int)packetnum++, radiopacket+13, 10);
 
   Serial.print("Sending "); Serial.println(radiopacket);
   radiopacket[14] = 0;
