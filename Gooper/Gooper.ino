@@ -105,7 +105,7 @@ void loop() {
 
   if (digitalRead(ARM_PIN) == HIGH) {
     ArmSystem = true;
-    if (digitalRead(FIRE_PIN) == HIGH && !Reset ) {
+    if (digitalRead(FIRE_PIN) == HIGH && !Reset && ArmIndicator) {
       FireSystem = true;
     } else {
       FireSystem = false;
@@ -148,14 +148,17 @@ void loop() {
 
     digitalWrite(BUZZ_PIN, ResetState);
     digitalWrite(FLED_PIN, ResetState);
+    digitalWrite(WEST_CON_PIN, HIGH);
   }
 
     while(FireSystem && !Reset) {
       digitalWrite(BUZZ_PIN, HIGH);
       digitalWrite(FLED_PIN, HIGH);
-      delay(1000);
-      FireSystem = false;
-      Reset = true;
+      if (ConIndicator) {
+        FireSystem = false;
+        Reset = true;
+        delay(100);
+      }
     }
 
   // Serial.print("System Armed: "); Serial.println(ArmSystem);
@@ -169,6 +172,7 @@ void loop() {
   if (ArmSystem == false && Reset == false){
     digitalWrite(BUZZ_PIN, LOW);
     digitalWrite(FLED_PIN, LOW);
+    digitalWrite(WEST_CON_PIN, LOW);
   }
 }
 
@@ -179,7 +183,7 @@ void setup1() {
   digitalWrite(RFM95_RST, HIGH);
 
   Serial.begin(115200);
-  while (!Serial) delay(1);
+  //while (!Serial); // debug
   delay(100);
 
   Serial.println("GOOPER TX");
@@ -220,20 +224,20 @@ void loop1() {
   // "<ArmSystem> <FireSystem> <ArmIndicator> <ConIndicator> <LowBatIndicator> <LowChgIndicator> #<PacketID>"
   // example: "1 0 1 0 0 1 #42"
   // This shows the system is sending an armed command and west has armed itself this is the 42nd handshake no firing or continuity. The box is low on igniter voltage but the main battery is fine.
+  int length = 20;
+  char packetTX[length];
+  sprintf(packetTX, "%d %d %d %d %d %d #       ", ArmSystem, FireSystem, ArmIndicator, ConIndicator, LowBatIndicator, LowChgIndicator);
+  itoa((int)packetnum++, packetTX+13, 10);
 
-  char radiopacket[15];
-  sprintf(radiopacket, "%d %d %d %d %d %d #      ", ArmSystem, FireSystem, ArmIndicator, ConIndicator, LowBatIndicator, LowChgIndicator);
-  itoa((int)packetnum++, radiopacket+13, 10);
-
-  Serial.print("Sending "); Serial.println(radiopacket);
-  radiopacket[14] = 0;
+  Serial.print("Sending "); Serial.println(packetTX);
+  packetTX[length-1] = 0;
 
   Serial.println("Sending...");
   delay(10);
-  rf95.send((uint8_t *)radiopacket, 20);
+  rf95.send((uint8_t *)packetTX, 20);
+  delay(10);
 
   Serial.println("Waiting for packet to complete...");
-  delay(10);
   rf95.waitPacketSent();
   // Now wait for a reply
   uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
@@ -244,19 +248,24 @@ void loop1() {
     // Should be a reply message for us now
     if (rf95.recv(buf, &len)) {
       Serial.print("Got reply: ");
-      Serial.println((char*)buf);
+      char* packetRX = (char*)buf; // decode packet
+      Serial.println(packetRX);
       Serial.print("RSSI: ");
       Serial.println(rf95.lastRssi(), DEC);
       digitalWrite(RLED_PIN, LOW);
+
+      // Recieve Information from WestSystems105
+      if (packetRX[4] == '1') { ArmIndicator  = true; } else { ArmIndicator  = false; } // ArmIndicator
+      if (packetRX[6] == '1') { ConIndicator = true; } else { ConIndicator = false; } // ConIndicator
+      if (packetRX[8] == '1') { LowBatIndicator = true; } else { LowBatIndicator = false; } // LowBatIndicator
+      if (packetRX[10] == '1') { LowChgIndicator = true; } else { LowChgIndicator = false; } // LowChgIndicator
+
     } else {
       Serial.println("Receive failed");
     }
   } else {
     Serial.println("No reply, is there a listener around?");
-  }
-
-  // recieve battery and other status info from WestSystems105
-
+  }  
 }
 
 /* -------------------- FUNCTIONS -------------------- */
