@@ -26,56 +26,59 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 /* -------------------- GLOBAL VARS -------------------- */
 
 // define pins
-const int BUZ_PIN = 5; // Peizo Buzzer
-const int LED1_PIN = 6; // Radio Indicator
-const int LED2_PIN = 9; // Pad LP Indicator
-const int LED3_PIN = 10; // Pad LC Indicator
-const int LED4_PIN = 11; // Pad Continuity Indicator
-const int LED5_PIN = 12; // Firing Button LED
-const int LED6_PIN = 13; // Power Switch LED
+const int BUZZ_PIN = 5; // Peizo Buzzer
+const int RLED_PIN = 6; // Radio Indicator
+const int WEST_LP_PIN = 9; // Pad LP Indicator
+const int WEST_LC_PIN = 10; // Pad LC Indicator
+const int WEST_CON_PIN = 11; // Pad Continuity Indicator
+const int FLED_PIN = 12; // Firing Button LED
+const int PLED_PIN = 13; // Power Switch LED
 
-const int ARM_PIN = 25;
-const int FIRE_PIN = 24;
-const int BAT_PIN = A0; // Controller Voltage divider
+const int ARM_PIN = 25; // Arming Switch Pin
+const int FIRE_PIN = 24; // Firing Button Pin
+
+const int BVOLT_PIN = A0; // Controller Voltage Divider
 
 // voltage
 int BatVoltage = 0;
 
 // radio variables
 int16_t packetnum = 0;  // packet counter, we increment per xmission
+int RadioTimeout = 1000; // Timeout in ms
 bool WestVoltage = true;
 bool IgnVoltage = true;
 bool Armed = false;
 bool Fire = false;
 bool Continuity = false;
 
-// Box States
-int ArmSW;
-int FireBTN;
-
 // Commands
 bool ArmSystem = false;
 bool FireSystem = false;
 
-// West State
+// West Checks
+bool ArmIndicator = false;
+bool ConIndicator = false;
 
 /* -------------------- CORE 0 -------------------- */
 
 void setup() {
   // define pin modes
-  pinMode(BUZ_PIN , OUTPUT);
-  pinMode(LED1_PIN, OUTPUT);
-  pinMode(LED2_PIN, OUTPUT);
-  pinMode(LED3_PIN, OUTPUT);
-  pinMode(LED4_PIN, OUTPUT);
-  pinMode(LED5_PIN, OUTPUT);
-  pinMode(LED6_PIN, OUTPUT);
+  pinMode(BUZZ_PIN , OUTPUT);
+  pinMode(RLED_PIN, OUTPUT);
+  pinMode(WEST_LP_PIN, OUTPUT);
+  pinMode(WEST_LC_PIN, OUTPUT);
+  pinMode(WEST_CON_PIN, OUTPUT);
+  pinMode(FLED_PIN, OUTPUT);
+  pinMode(PLED_PIN, OUTPUT);
 
   pinMode(ARM_PIN, INPUT);
   pinMode(FIRE_PIN, INPUT);
 
   // begin serial
   Serial.begin(115200);
+
+  // Set power LED on Should check battery voltage in the final code
+  digitalWrite(PLED_PIN, HIGH);
 
   // ensure startup success
   while (digitalRead(ARM_PIN) == HIGH || digitalRead(FIRE_PIN) == HIGH) {
@@ -89,17 +92,11 @@ void setup() {
 // STANDARD LOOP
 void loop() {
   // read and print battery voltage
-  BatVoltage = analogRead(BAT_PIN); Serial.println(BatVoltage);
-    
-  // check ARMING SWITCH
-  ArmSW = digitalRead(ARM_PIN);
+  BatVoltage = analogRead(BVOLT_PIN); // Serial.println(BatVoltage);
 
-  // check FIRE BUTTON
-  FireBTN = digitalRead(FIRE_PIN);
-
-  if (ArmSW == HIGH) {
+  if (digitalRead(ARM_PIN) == HIGH) {
     ArmSystem = true;
-    if (FireBTN == HIGH) {
+    if (digitalRead(FIRE_PIN) == HIGH) {
       FireSystem = true;
     } else {
       FireSystem = false;
@@ -109,6 +106,10 @@ void loop() {
     FireSystem = false;
   }
 
+  // Serial.print("System Armed: "); Serial.println(ArmSystem);
+  // Serial.print("Fireing: "); Serial.println(FireSystem);
+
+  delay(200);
   // if armed
     // while armed, prepare to fire
     // check for signal from firing switch
@@ -163,12 +164,13 @@ void loop1() {
   delay(500); //wait between transmits
 
   Serial.println("Transmitting...");
-
+  digitalWrite(RLED_PIN, HIGH);
   if (ArmSystem == true) {
-    char radiopacket
+    char radiopacket ;
   }
-  char radiopacket[20] = "Hello World #      ";
-  itoa(packetnum++, radiopacket+13, 10);
+
+  char radiopacket[20] = "Ping #      ";
+  itoa(packetnum++, radiopacket+6, 10);
   Serial.print("Sending "); Serial.println(radiopacket);
   radiopacket[19] = 0;
 
@@ -184,13 +186,14 @@ void loop1() {
   uint8_t len = sizeof(buf);
 
   Serial.println("Waiting for reply...");
-  if (rf95.waitAvailableTimeout(1000)) {
+  if (rf95.waitAvailableTimeout(RadioTimeout)) {
     // Should be a reply message for us now
     if (rf95.recv(buf, &len)) {
       Serial.print("Got reply: ");
       Serial.println((char*)buf);
       Serial.print("RSSI: ");
       Serial.println(rf95.lastRssi(), DEC);
+      digitalWrite(RLED_PIN, LOW);
     } else {
       Serial.println("Receive failed");
     }
