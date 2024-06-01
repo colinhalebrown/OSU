@@ -53,13 +53,20 @@ bool FireSystem = false;
 // West Checks
 bool ArmIndicator = false;
 bool ConIndicator = false;
-bool WestVoltage = false;
-bool IgnVoltage = false;
+bool LowBatIndicator = false;
+bool LowChgIndicator = false;
 
 // UI variables
-int BlinkInterval = 300;
-unsigned long previousMillis = 0;
-int BlinkState = LOW;
+int ArmInterval = 400;
+int ArmState = LOW;
+unsigned long PreviousArmMillis = 0;
+unsigned long CurrentArmMillis = 0;
+bool Reset = false;
+int ResetIntervalA = 200;
+int ResetIntervalB = 600;
+int ResetState = LOW;
+unsigned long PreviousResetMillis = 0;
+unsigned long CurrentResetMillis = 0;
 
 /* -------------------- CORE 0 -------------------- */
 
@@ -98,66 +105,71 @@ void loop() {
 
   if (digitalRead(ARM_PIN) == HIGH) {
     ArmSystem = true;
+    if (digitalRead(FIRE_PIN) == HIGH && !Reset ) {
+      FireSystem = true;
+    } else {
+      FireSystem = false;
+    }
   } else {
     ArmSystem = false;
     FireSystem = false;
+    Reset = false;
   }
 
-  digitalWrite(BUZZ_PIN, LOW);
-  digitalWrite(FLED_PIN, LOW);
+  if (ArmSystem && !Reset) {
+    CurrentArmMillis = millis();
 
-  while(ArmSystem == true) {
-    unsigned long currentMillis = millis();
+    if (CurrentArmMillis - PreviousArmMillis >= ArmInterval) {
+      PreviousArmMillis = CurrentArmMillis;
 
-    if (currentMillis - previousMillis >= BlinkInterval) {
-      
-      previousMillis = currentMillis;
-
-      if (BlinkState == LOW) {
-        BlinkState = HIGH;
+      if (ArmState == LOW) {
+        ArmState = HIGH;
       } else {
-        BlinkState = LOW;
+        ArmState = LOW;
       }
     }
 
-    digitalWrite(BUZZ_PIN, BlinkState);
-    digitalWrite(FLED_PIN, BlinkState);
+    digitalWrite(BUZZ_PIN, ArmState);
+    digitalWrite(FLED_PIN, ArmState);
+  }
 
-    if (digitalRead(ARM_PIN) == HIGH) {
-      ArmSystem = true;
-      if (digitalRead(FIRE_PIN) == HIGH) {
-        FireSystem = true;
+  if (Reset) {
+    CurrentResetMillis = millis();
+
+    if (CurrentResetMillis - PreviousResetMillis >= ResetIntervalA) {
+      PreviousResetMillis = CurrentResetMillis;
+
+      if (ResetState == LOW) {
+        ResetState = HIGH;
       } else {
-        FireSystem = false;
+        ResetState = LOW;
       }
-    } else {
-      ArmSystem = false;
+    }
+
+    digitalWrite(BUZZ_PIN, ResetState);
+    digitalWrite(FLED_PIN, ResetState);
+  }
+
+    while(FireSystem && !Reset) {
+      digitalWrite(BUZZ_PIN, HIGH);
+      digitalWrite(FLED_PIN, HIGH);
+      delay(1000);
       FireSystem = false;
+      Reset = true;
     }
-
-  }
 
   // Serial.print("System Armed: "); Serial.println(ArmSystem);
   // Serial.print("Fireing: "); Serial.println(FireSystem);
-
-  if (ArmSystem == true) {
-    // blink fire light
-    // blink 
-  } else if (FireSystem == true) {
-
-  }
-
-  delay(200);
-  // if armed
-    // while armed, prepare to fire
-    // check for signal from firing switch
-    // blink firing button
-    // beep to indicate armed
   
   // indicate battery status of WestSystems105
   // indicate cont. status of WS105
   // indicate battery status of GOOPER
   // indicate radio connection status
+
+  if (ArmSystem == false && Reset == false){
+    digitalWrite(BUZZ_PIN, LOW);
+    digitalWrite(FLED_PIN, LOW);
+  }
 }
 
 /* -------------------- CORE 1 -------------------- */
@@ -205,12 +217,12 @@ void loop1() {
   digitalWrite(RLED_PIN, HIGH);
 
   // Packet Format
-  // "<ArmSystem> <FireSystem> <ArmIndicator> <ConIndicator> <WestVoltage> <IgnVoltage> #<PacketID>"
+  // "<ArmSystem> <FireSystem> <ArmIndicator> <ConIndicator> <LowBatIndicator> <LowChgIndicator> #<PacketID>"
   // example: "1 0 1 0 0 1 #42"
   // This shows the system is sending an armed command and west has armed itself this is the 42nd handshake no firing or continuity. The box is low on igniter voltage but the main battery is fine.
 
   char radiopacket[15];
-  sprintf(radiopacket, "%d %d %d %d %d %d #      ", ArmSystem, FireSystem, ArmIndicator, ConIndicator, WestVoltage, IgnVoltage);
+  sprintf(radiopacket, "%d %d %d %d %d %d #      ", ArmSystem, FireSystem, ArmIndicator, ConIndicator, LowBatIndicator, LowChgIndicator);
   itoa((int)packetnum++, radiopacket+13, 10);
 
   Serial.print("Sending "); Serial.println(radiopacket);
