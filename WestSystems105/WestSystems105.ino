@@ -26,11 +26,11 @@ RH_RF95 rf95(RFM95_CS, RFM95_INT);
 /* -------------------- GLOBAL VARS -------------------- */
 
 // define pins
-const int BUZZ_PIN = 5;   // Peizo Buzzer
-const int RLED_PIN = 6;   // Radio Indicator
-const int ALED_PIN = 9;   // Armed Indicator
-const int ARM_PIN  = 10;  // Arming Relay
-const int FIRE_PIN = 11;  // Firing Relay
+const int BUZZ_PIN  = 5;  // Peizo Buzzer
+const int RLED_PIN  = 6;  // Radio Indicator
+const int ALED_PIN  = 9;  // Armed Indicator
+const int ARM_PIN   = 10; // Arming Relay
+const int FIRE_PIN  = 11; // Firing Relay
 const int BAT_PIN   = A0; // Controller voltage divider
 const int IVOLT_PIN = A1; // Ignitor voltage divider
 const int AVOLT_PIN = A2; // Arming continuity voltage divider
@@ -43,17 +43,25 @@ int ArmVoltage = 0;
 int ConVoltage = 0;
 
 // Commands
-bool ArmSystem = false;
+bool ArmSystem  = false;
 bool FireSystem = false;
 
 // West State
 bool Standby = false;
-bool Armed = false;
-bool Fire = false;
+bool Armed   = false;
+bool Fire    = false;
 
 // Checks
-bool ArmIndicator = false;
-bool ConIndicator = false;
+bool ArmIndicator    = false;
+bool ConIndicator    = false;
+bool LowBatIndicator = false;
+bool LowChgIndicator = false;
+
+// UI Variables
+int ArmInterval = 400;
+int ArmState = LOW;
+unsigned long PreviousArmMillis = 0;
+unsigned long CurrentArmMillis = 0;
 
 /* -------------------- CORE 0 -------------------- */
 
@@ -82,22 +90,42 @@ void loop() {
   ArmVoltage = analogRead(AVOLT_PIN); //Serial.print("Arm Voltage "); Serial.println(ArmVoltage);
   ConVoltage = analogRead(CVOLT_PIN); //Serial.print("Continuity Voltage "); Serial.println(ConVoltage);
   
-  if (ArmVoltage > 100) {
-    ArmIndicator = true;
+  // UPDATE ARMING VOLTAGE
+  if (ArmVoltage > 100) { ArmIndicator = true; } else { ArmIndicator = false; }
+
+  // UPDATE CONT. VOLTAGE
+  if (ConVoltage > 100) { ConIndicator = true; } else { ConIndicator = false; }
+
+  // UPDATE ARMING RELAY
+  if (ArmSystem) {
+    digitalWrite(ARM_PIN,HIGH); // ARM RELAY
+    CurrentArmMillis = millis(); // get current time for arming
+    // if within interval
+    if (CurrentArmMillis - PreviousArmMillis >= ArmInterval) {
+      PreviousArmMillis = CurrentArmMillis; // update previous
+      if (ArmState == LOW) { // if currently off,
+        ArmState = HIGH; // turn on
+      } else {
+        ArmState = LOW; // turn off
+      }
+    }
+    // blink and buzz accordingly
+    digitalWrite(BUZZ_PIN, ArmState);
+    digitalWrite(ALED_PIN,!ArmState);
   } else {
-    ArmIndicator = false;
+    // don't blink or buzz
+    digitalWrite(BUZZ_PIN, LOW); // off 
+    digitalWrite(ALED_PIN,HIGH); // off
   }
 
-  if (ConVoltage > 100) {
-    ConIndicator = true;
-  } else {
-    ConIndicator = false;
-  }
+  // UPDATE FIRING PIN
+  if (ArmSystem && FireSystem) { digitalWrite(FIRE_PIN,HIGH); } else { digitalWrite(FIRE_PIN,LOW); }
 
+  // Update ArmIndicator Boolean
+  if (ArmVoltage > 20) { ArmIndicator = true; } else { ArmIndicator = false; }
 
-  // confirm relays are in the position they are supposed to be in
-
-  // 
+  // Update ConIndicator Boolean
+  if (ConVoltage > 20) { ConIndicator = true; } else { ConIndicator = false; }
 
 }
 
@@ -144,19 +172,22 @@ void loop1() {
       // print data received
       digitalWrite(RLED_PIN, LOW); // Turn off LED
       //RH_RF95::printBuffer("Received: ", buf, len); // print out hexadecimal
-      char* packet = (char*)buf; // decode packet
-      Serial.print("Got: "); Serial.println(packet); // print decoded message
+      char* packetRX = (char*)buf; // decode packet
       Serial.print("RSSI: "); Serial.println(rf95.lastRssi(), DEC); // print signal strength
+      Serial.print("RX: "); Serial.println(packetRX); // print decoded message
 
       // Adjust Commands and Checks
-      if (packet[0] == '1') { ArmSystem  = true; } else { ArmSystem  = false; } // ArmSystem
-      if (packet[2] == '1') { FireSystem = true; } else { FireSystem = false; } // FireSystem
+      if (packetRX[0] == '1') { ArmSystem  = true; } else { ArmSystem  = false; } // ArmSystem
+      if (packetRX[2] == '1') { FireSystem = true; } else { FireSystem = false; } // FireSystem
+
+      // Update packet
+      sprintf(packetRX, "%d %d %d %d %d %d #      ", ArmSystem, FireSystem, ArmIndicator, ConIndicator, LowBatIndicator, LowChgIndicator);
 
       // Send a reply
-      uint8_t data[] = "pong";
-      rf95.send(data, sizeof(data));
+      uint8_t* packetTX = (uint8_t*)atoi(packetRX);
+      rf95.send(packetTX, sizeof(packetTX));
       rf95.waitPacketSent();
-      Serial.println("Sent a reply");
+      Serial.print("TX: "); Serial.println(packetRX);
       digitalWrite(RLED_PIN, HIGH); // Blink LED
     } else {
       Serial.println("Receive failed");
