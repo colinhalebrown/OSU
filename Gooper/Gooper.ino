@@ -165,14 +165,23 @@ void loop1() {
 
   Serial.println("Transmitting...");
   digitalWrite(RLED_PIN, HIGH);
+
   if (ArmSystem == true) {
     char radiopacket ;
   }
 
-  char radiopacket[20] = "Ping #      ";
-  itoa(packetnum++, radiopacket+6, 10);
+  // Packet Format
+  // "<ArmSystem> <FireSystem> <ArmIndicator> <ConIndicator> #<PacketID>"
+  // example: "1 0 1 0 #42"
+  // This shows the system is sending an armed command and west has armed itself this is the 42nd handshake no firing or continuity 
+
+
+  char radiopacket[15];
+  sprintf(radiopacket, "%d %d %d %d #      ", ArmSystem, FireSystem, ArmIndicator, ConIndicator);
+  itoa((int)packetnum++, radiopacket+9, 10);
+
   Serial.print("Sending "); Serial.println(radiopacket);
-  radiopacket[19] = 0;
+  radiopacket[14] = 0;
 
   Serial.println("Sending...");
   delay(10);
